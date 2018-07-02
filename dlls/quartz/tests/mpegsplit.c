@@ -23,29 +23,41 @@
 #include "wine/test.h"
 #include "dshow.h"
 
-static IUnknown *create_mpeg_splitter(void)
+static IBaseFilter *create_mpeg_splitter(void)
 {
-    IUnknown *mpeg_splitter = NULL;
-    HRESULT result = CoCreateInstance(&CLSID_MPEG1Splitter, NULL, CLSCTX_INPROC_SERVER,
-            &IID_IUnknown, (void **)&mpeg_splitter);
-    ok(S_OK == result, "got 0x%08x\n", result);
-    return mpeg_splitter;
+    IBaseFilter *filter = NULL;
+    HRESULT hr = CoCreateInstance(&CLSID_MPEG1Splitter, NULL, CLSCTX_INPROC_SERVER,
+        &IID_IBaseFilter, (void **)&filter);
+    ok(hr == S_OK, "got %#x\n", hr);
+    return filter;
+}
+
+#define check_interface(a, b, c) check_interface_(__LINE__, a, b, c)
+static void check_interface_(unsigned int line, void *iface_ptr, REFIID iid, BOOL supported)
+{
+    IUnknown *iface = iface_ptr;
+    HRESULT hr, expected_hr;
+    IUnknown *unk;
+
+    expected_hr = supported ? S_OK : E_NOINTERFACE;
+
+    hr = IUnknown_QueryInterface(iface, iid, (void **)&unk);
+    ok_(__FILE__, line)(hr == expected_hr, "Got hr %#x, expected %#x.\n", hr, expected_hr);
+    if (SUCCEEDED(hr))
+        IUnknown_Release(unk);
 }
 
 static void test_query_interface(void)
 {
-    IUnknown *mpeg_splitter = create_mpeg_splitter();
+    IBaseFilter *filter = create_mpeg_splitter();
 
-    IAMStreamSelect *stream_select = NULL;
-    HRESULT result = IUnknown_QueryInterface(
-            mpeg_splitter, &IID_IAMStreamSelect, (void **)&stream_select);
-    ok(S_OK == result, "got 0x%08x\n", result);
-    if (S_OK == result)
-    {
-        IAMStreamSelect_Release(stream_select);
-    }
+    check_interface(filter, &IID_IBaseFilter, TRUE);
+    check_interface(filter, &IID_IAMStreamSelect, TRUE);
+    check_interface(filter, &IID_IPin, FALSE);
+    check_interface(filter, &IID_IVideoWindow, FALSE);
+    check_interface(filter, &IID_IPersistPropertyBag, FALSE);
 
-    IUnknown_Release(mpeg_splitter);
+    IBaseFilter_Release(filter);
 }
 
 START_TEST(mpegsplit)
