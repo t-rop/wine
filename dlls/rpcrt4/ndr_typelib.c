@@ -189,6 +189,27 @@ static unsigned char get_array_fc(ITypeInfo *typeinfo, TYPEDESC *desc)
         return FC_BOGUS_ARRAY;
 }
 
+static size_t write_struct_tfs(ITypeInfo *typeinfo, unsigned char *str,
+    size_t *len, TYPEATTR *attr)
+{
+    /* The only reason to bother writing the embedded types is for endianness
+     * conversion. Since Wine doesn't support that, don't. */
+
+    unsigned char fc = get_struct_fc(typeinfo, attr);
+    size_t off = *len;
+
+    if (fc != FC_STRUCT)
+        FIXME("fc %02x not implemented\n", fc);
+
+    WRITE_CHAR (str, *len, fc);
+    WRITE_CHAR (str, *len, attr->cbAlignment - 1);
+    WRITE_SHORT(str, *len, attr->cbSizeInstance);
+    WRITE_CHAR (str, *len, FC_PAD);
+    WRITE_CHAR (str, *len, FC_END);
+
+    return off;
+}
+
 static size_t write_array_tfs(ITypeInfo *typeinfo, unsigned char *str,
     size_t *len, ARRAYDESC *desc)
 {
@@ -320,6 +341,25 @@ static size_t write_type_tfs(ITypeInfo *typeinfo, unsigned char *str,
         return write_pointer_tfs(str, len, desc->vt, ref, toplevel, onstack);
     case VT_CARRAY:
         return write_array_tfs(typeinfo, str, len, desc->lpadesc);
+    case VT_USERDEFINED:
+        ITypeInfo_GetRefTypeInfo(typeinfo, desc->hreftype, &refinfo);
+        ITypeInfo_GetTypeAttr(refinfo, &attr);
+
+        switch (attr->typekind)
+        {
+        case TKIND_RECORD:
+            off = write_struct_tfs(refinfo, str, len, attr);
+            break;
+        default:
+            FIXME("unhandled kind %u\n", attr->typekind);
+            off = *len;
+            WRITE_SHORT(str, *len, 0);
+            break;
+        }
+
+        ITypeInfo_ReleaseTypeAttr(refinfo, attr);
+        ITypeInfo_Release(refinfo);
+        break;
     default:
         /* base types are always embedded directly */
         assert(!get_base_type(desc->vt));
