@@ -2318,6 +2318,34 @@ err:
     return hr;
 }
 
+/* Dual interfaces report their size to be sizeof(IDispatchVtbl) and their
+ * implemented type to be IDispatch. We need to retrieve the underlying
+ * interface to get that information. */
+static HRESULT get_real_typeinfo(ITypeInfo *typeinfo, ITypeInfo **ret)
+{
+    HREFTYPE reftype;
+    TYPEATTR *attr;
+    TYPEKIND kind;
+    HRESULT hr;
+
+    hr = ITypeInfo_GetTypeAttr(typeinfo, &attr);
+    if (FAILED(hr)) return hr;
+    kind = attr->typekind;
+    ITypeInfo_ReleaseTypeAttr(typeinfo, attr);
+
+    if (kind == TKIND_DISPATCH)
+    {
+        hr = ITypeInfo_GetRefTypeOfImplType(typeinfo, -1, &reftype);
+        if (FAILED(hr)) return hr;
+
+        return ITypeInfo_GetRefTypeInfo(typeinfo, reftype, ret);
+    }
+
+    ITypeInfo_AddRef(typeinfo);
+    *ret = typeinfo;
+    return S_OK;
+}
+
 static void init_stub_desc(MIDL_STUB_DESC *desc)
 {
     desc->pfnAllocate = NdrOleAllocate;
@@ -2398,15 +2426,22 @@ HRESULT WINAPI CreateProxyFromTypeInfo(ITypeInfo *typeinfo, IUnknown *outer,
     TRACE("typeinfo %p, outer %p, iid %s, proxy %p, obj %p.\n",
         typeinfo, outer, debugstr_guid(iid), proxy, obj);
 
-    hr = ITypeInfo_GetTypeAttr(typeinfo, &typeattr);
+    hr = get_real_typeinfo(typeinfo, &typeinfo);
     if (FAILED(hr))
         return hr;
+
+    hr = ITypeInfo_GetTypeAttr(typeinfo, &typeattr);
+    if (FAILED(hr))
+        goto done;
     funcs = typeattr->cFuncs;
     vtbl_size = typeattr->cbSizeVft;
     ITypeInfo_ReleaseTypeAttr(typeinfo, typeattr);
 
     if (!(This = heap_alloc_zero(sizeof(*This))))
-        return E_OUTOFMEMORY;
+    {
+        hr = E_OUTOFMEMORY;
+        goto done;
+    }
 
     init_stub_desc(&This->stub_desc);
     This->proxy_info.pStubDesc = &This->stub_desc;
@@ -2415,7 +2450,8 @@ HRESULT WINAPI CreateProxyFromTypeInfo(ITypeInfo *typeinfo, IUnknown *outer,
     if (!This->proxy_vtbl)
     {
         heap_free(This);
-        return E_OUTOFMEMORY;
+        hr = E_OUTOFMEMORY;
+        goto done;
     }
     This->proxy_vtbl->header.pStublessProxyInfo = &This->proxy_info;
     This->iid = *iid;
@@ -2429,7 +2465,7 @@ HRESULT WINAPI CreateProxyFromTypeInfo(ITypeInfo *typeinfo, IUnknown *outer,
     {
         heap_free(This->proxy_vtbl);
         heap_free(This);
-        return hr;
+        goto done;
     }
     This->proxy_info.FormatStringOffset = &This->offset_table[-3];
 
@@ -2443,6 +2479,8 @@ HRESULT WINAPI CreateProxyFromTypeInfo(ITypeInfo *typeinfo, IUnknown *outer,
         heap_free(This);
     }
 
+done:
+    ITypeInfo_Release(typeinfo);
     return hr;
 }
 
@@ -2511,15 +2549,22 @@ HRESULT WINAPI CreateStubFromTypeInfo(ITypeInfo *typeinfo, REFIID iid,
     TRACE("typeinfo %p, iid %s, server %p, stub %p.\n",
         typeinfo, debugstr_guid(iid), server, stub);
 
+    hr = get_real_typeinfo(typeinfo, &typeinfo);
+    if (FAILED(hr))
+        goto done;
+
     hr = ITypeInfo_GetTypeAttr(typeinfo, &typeattr);
     if (FAILED(hr))
-        return hr;
+        goto done;
     funcs = typeattr->cFuncs;
     vtbl_size = typeattr->cbSizeVft;
     ITypeInfo_ReleaseTypeAttr(typeinfo, typeattr);
 
     if (!(This = heap_alloc_zero(sizeof(*This))))
-        return E_OUTOFMEMORY;
+    {
+        hr = E_OUTOFMEMORY;
+        goto done;
+    }
 
     init_stub_desc(&This->stub_desc);
     This->server_info.pStubDesc = &This->stub_desc;
@@ -2529,7 +2574,7 @@ HRESULT WINAPI CreateStubFromTypeInfo(ITypeInfo *typeinfo, REFIID iid,
     if (FAILED(hr))
     {
         heap_free(This);
-        return hr;
+        goto done;
     }
     This->server_info.FmtStringOffset = &This->offset_table[-3];
 
@@ -2549,5 +2594,7 @@ HRESULT WINAPI CreateStubFromTypeInfo(ITypeInfo *typeinfo, REFIID iid,
         heap_free(This);
     }
 
+done:
+    ITypeInfo_Release(typeinfo);
     return hr;
 }
