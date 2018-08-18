@@ -34,7 +34,7 @@ static HRESULT (WINAPI *pVarAdd)(LPVARIANT,LPVARIANT,LPVARIANT);
 
 #define ok_ole_success(hr, func) ok(hr == S_OK, #func " failed with error 0x%08x\n", hr)
 
-#ifdef __i386__
+#if defined(__i386__) || defined(__x86_64__)
 static const int tmarshal_todo = 0;
 #else
 static const int tmarshal_todo = 1;
@@ -1601,9 +1601,9 @@ static void test_typelibmarshal(void)
     V_I4(&vararg[1]) = 2;
     hr = IWidget_VariantCArray(pWidget, 2, vararg);
     ok_ole_success(hr, IWidget_VariantCArray);
-    todo_wine_if(!tmarshal_todo)
+    todo_wine_if(tmarshal_todo)
     ok(V_VT(&vararg[0]) == VT_I4 && V_I4(&vararg[0]) == 2, "vararg[0] = %d[%d]\n", V_VT(&vararg[0]), V_I4(&vararg[0]));
-    todo_wine_if(!tmarshal_todo)
+    todo_wine_if(tmarshal_todo)
     ok(V_VT(&vararg[1]) == VT_I4 && V_I4(&vararg[1]) == 3, "vararg[1] = %d[%d]\n", V_VT(&vararg[1]), V_I4(&vararg[1]));
 
     /* call VarArg */
