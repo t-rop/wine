@@ -1984,17 +1984,6 @@ void WINAPI KeQueryTickCount( LARGE_INTEGER *count )
 
 
 /***********************************************************************
- *           KeReleaseSemaphore   (NTOSKRNL.EXE.@)
- */
-LONG WINAPI KeReleaseSemaphore( PRKSEMAPHORE Semaphore, KPRIORITY Increment,
-                                LONG Adjustment, BOOLEAN Wait )
-{
-    FIXME("(%p %d %d %d) stub\n", Semaphore, Increment, Adjustment, Wait );
-    return 0;
-}
-
-
-/***********************************************************************
  *           KeQueryTimeIncrement   (NTOSKRNL.EXE.@)
  */
 ULONG WINAPI KeQueryTimeIncrement(void)
