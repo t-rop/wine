@@ -269,6 +269,14 @@ void fsync_wake_up( struct object *obj )
     }
 }
 
+void fsync_clear( struct object *obj )
+{
+    enum fsync_type type;
+    struct fsync_event *event = get_shm( obj->ops->get_fsync_idx( obj, &type ) );
+
+    __atomic_store_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
+}
+
 DECL_HANDLER(create_fsync)
 {
     struct fsync *fsync;
