@@ -346,6 +346,21 @@ NTSTATUS fsync_set_event( HANDLE handle )
     return STATUS_SUCCESS;
 }
 
+NTSTATUS fsync_reset_event( HANDLE handle )
+{
+    struct event *event;
+    struct fsync *obj;
+
+    TRACE("%p.\n", handle);
+
+    if (!(obj = get_cached_object( handle ))) return STATUS_INVALID_HANDLE;
+    event = obj->shm;
+
+    __atomic_store_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
+
+    return STATUS_SUCCESS;
+}
+
 #define TICKSPERSEC        ((ULONGLONG)10000000)
 
 static LONGLONG update_timeout( ULONGLONG end )
