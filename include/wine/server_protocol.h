@@ -5664,6 +5664,14 @@ struct terminate_job_reply
     struct reply_header __header;
 };
 
+enum fsync_type
+{
+    FSYNC_SEMAPHORE = 1,
+    FSYNC_AUTO_EVENT,
+    FSYNC_MANUAL_EVENT,
+    FSYNC_MANUAL_SERVER,
+};
+
 
 struct create_fsync_request
 {
@@ -5677,6 +5685,19 @@ struct create_fsync_reply
 {
     struct reply_header __header;
     obj_handle_t handle;
+    unsigned int shm_idx;
+};
+
+
+struct get_fsync_idx_request
+{
+    struct request_header __header;
+    obj_handle_t handle;
+};
+struct get_fsync_idx_reply
+{
+    struct reply_header __header;
+    int          type;
     unsigned int shm_idx;
 };
 
@@ -5975,6 +5996,7 @@ enum request
     REQ_set_job_completion_port,
     REQ_terminate_job,
     REQ_create_fsync,
+    REQ_get_fsync_idx,
     REQ_NB_REQUESTS
 };
 
@@ -6274,6 +6296,7 @@ union generic_request
     struct set_job_completion_port_request set_job_completion_port_request;
     struct terminate_job_request terminate_job_request;
     struct create_fsync_request create_fsync_request;
+    struct get_fsync_idx_request get_fsync_idx_request;
 };
 union generic_reply
 {
@@ -6571,8 +6594,9 @@ union generic_reply
     struct set_job_completion_port_reply set_job_completion_port_reply;
     struct terminate_job_reply terminate_job_reply;
     struct create_fsync_reply create_fsync_reply;
+    struct get_fsync_idx_reply get_fsync_idx_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 573
+#define SERVER_PROTOCOL_VERSION 574
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */
