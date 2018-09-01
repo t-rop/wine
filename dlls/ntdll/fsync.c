@@ -23,6 +23,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -327,6 +328,22 @@ NTSTATUS fsync_create_event( HANDLE *handle, ACCESS_MASK access,
         event_type == NotificationEvent ? "manual" : "auto", initial);
 
     return create_fsync( type, handle, access, attr, initial, 0xdeadbeef );
+}
+
+NTSTATUS fsync_set_event( HANDLE handle )
+{
+    struct event *event;
+    struct fsync *obj;
+
+    TRACE("%p.\n", handle);
+
+    if (!(obj = get_cached_object( handle ))) return STATUS_INVALID_HANDLE;
+    event = obj->shm;
+
+    if (!__atomic_exchange_n( &event->signaled, 1, __ATOMIC_SEQ_CST ))
+        futex_wake( &event->signaled, obj->type == FSYNC_AUTO_EVENT ? 1 : INT_MAX );
+
+    return STATUS_SUCCESS;
 }
 
 #define TICKSPERSEC        ((ULONGLONG)10000000)
