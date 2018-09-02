@@ -5702,6 +5702,16 @@ struct get_fsync_idx_reply
     unsigned int shm_idx;
 };
 
+struct fsync_msgwait_request
+{
+    struct request_header __header;
+    int          in_msgwait;
+};
+struct fsync_msgwait_reply
+{
+    struct reply_header __header;
+};
+
 
 enum request
 {
@@ -5998,6 +6008,7 @@ enum request
     REQ_terminate_job,
     REQ_create_fsync,
     REQ_get_fsync_idx,
+    REQ_fsync_msgwait,
     REQ_NB_REQUESTS
 };
 
@@ -6298,6 +6309,7 @@ union generic_request
     struct terminate_job_request terminate_job_request;
     struct create_fsync_request create_fsync_request;
     struct get_fsync_idx_request get_fsync_idx_request;
+    struct fsync_msgwait_request fsync_msgwait_request;
 };
 union generic_reply
 {
@@ -6596,8 +6608,9 @@ union generic_reply
     struct terminate_job_reply terminate_job_reply;
     struct create_fsync_reply create_fsync_reply;
     struct get_fsync_idx_reply get_fsync_idx_reply;
+    struct fsync_msgwait_reply fsync_msgwait_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 574
+#define SERVER_PROTOCOL_VERSION 575
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */
