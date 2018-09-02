@@ -90,6 +90,7 @@ struct thread
     timeout_t              exit_time;     /* Thread exit time */
     struct token          *token;         /* security token associated with this thread */
     unsigned int           fsync_idx;
+    unsigned int           fsync_apc_idx;
 };
 
 struct thread_snapshot
