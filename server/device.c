@@ -38,6 +38,7 @@
 #include "handle.h"
 #include "request.h"
 #include "process.h"
+#include "fsync.h"
 
 /* IRP object */
 
@@ -88,10 +89,12 @@ struct device_manager
     struct object          obj;           /* object header */
     struct list            devices;       /* list of devices */
     struct list            requests;      /* list of pending irps across all devices */
+    unsigned int           fsync_idx;
 };
 
 static void device_manager_dump( struct object *obj, int verbose );
 static int device_manager_signaled( struct object *obj, struct wait_queue_entry *entry );
+static unsigned int device_manager_get_fsync_idx( struct object *obj, enum fsync_type *type );
 static void device_manager_destroy( struct object *obj );
 
 static const struct object_ops device_manager_ops =
@@ -102,7 +105,7 @@ static const struct object_ops device_manager_ops =
     add_queue,                        /* add_queue */
     remove_queue,                     /* remove_queue */
     device_manager_signaled,          /* signaled */
-    NULL,                             /* get_fsync_idx */
+    device_manager_get_fsync_idx,     /* get_fsync_idx */
     no_satisfied,                     /* satisfied */
     no_signal,                        /* signal */
     no_get_fd,                        /* get_fd */
@@ -577,6 +580,9 @@ static void delete_file( struct device_file *file )
     /* terminate all pending requests */
     LIST_FOR_EACH_ENTRY_SAFE( irp, next, &file->requests, struct irp_call, dev_entry )
     {
+        if (do_fsync() && file->device->manager && list_empty( &file->device->manager->requests ))
+            fsync_clear( &file->device->manager->obj );
+
         list_remove( &irp->mgr_entry );
         set_irp_result( irp, STATUS_FILE_DELETED, NULL, 0, 0 );
     }
@@ -609,6 +615,13 @@ static int device_manager_signaled( struct object *obj, struct wait_queue_entry 
     return !list_empty( &manager->requests );
 }
 
+static unsigned int device_manager_get_fsync_idx( struct object *obj, enum fsync_type *type )
+{
+    struct device_manager *manager = (struct device_manager *)obj;
+    *type = FSYNC_MANUAL_SERVER;
+    return manager->fsync_idx;
+}
+
 static void device_manager_destroy( struct object *obj )
 {
     struct device_manager *manager = (struct device_manager *)obj;
@@ -629,6 +642,9 @@ static struct device_manager *create_device_manager(void)
     {
         list_init( &manager->devices );
         list_init( &manager->requests );
+
+        if (do_fsync())
+            manager->fsync_idx = fsync_alloc_shm( 0, 0 );
     }
     return manager;
 }
@@ -735,6 +751,9 @@ DECL_HANDLER(get_next_device_request)
             iosb->in_size = 0;
             list_remove( &irp->mgr_entry );
             list_init( &irp->mgr_entry );
+
+            if (do_fsync() && list_empty( &manager->requests ))
+                fsync_clear( &manager->obj );
         }
     }
     else set_error( STATUS_PENDING );
